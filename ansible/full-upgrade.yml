@@ -1,0 +1,16 @@
+- name: Full upgrade
+  hosts: all
+  become: true
+  tasks:
+    - name: Full upgrade
+      ansible.builtin.apt:
+        update_cache: true
+        upgrade: dist
+        autoremove: true
+    - name: if reboot needed
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: reboot_flag
+    - name: Reboot
+      ansible.builtin.reboot:
+      when: reboot_flag.stat.exists

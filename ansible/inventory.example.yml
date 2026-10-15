@@ -1,0 +1,9 @@
+# copy to inventory.yml (git-ignored) and fill in your hosts
+servers:
+  hosts:
+    app01:
+      ansible_host: 10.0.12.16
+    app02:
+      ansible_host: 10.0.12.57
+  vars:
+    ansible_user: root

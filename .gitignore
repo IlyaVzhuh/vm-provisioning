@@ -1,0 +1,9 @@
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform.lock.hcl
+hosts.conf
+ansible/inventory.yml
+# per-VM working copies made by new-server.sh
+terraform/*/*/

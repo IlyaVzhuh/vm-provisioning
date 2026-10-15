@@ -1,0 +1,11 @@
+#cloud-config
+disable_root: false
+users:
+  - name: root
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAA...your-public-key... you@example.com
+package_update: true
+packages: [qemu-guest-agent, open-vm-tools]
+timezone: Europe/Moscow
+runcmd:
+  - systemctl enable --now qemu-guest-agent

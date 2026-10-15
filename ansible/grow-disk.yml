@@ -1,0 +1,64 @@
+# grow-disk.yml - run after enlarging the disk in ESXi/Terraform
+- name: Grow root filesystem to use the whole disk
+  hosts: all
+  become: true
+  tasks:
+    - name: Install growpart
+      ansible.builtin.apt:
+        name: cloud-guest-utils
+        state: present
+
+    - name: Find what / is mounted from
+      ansible.builtin.command: findmnt -n -o SOURCE /
+      register: root_src
+      changed_when: false
+
+    - name: Find the partition under / (works for plain and LVM)
+      ansible.builtin.shell: |
+        dev=$(findmnt -n -o SOURCE /)
+        # for LVM, take the physical volume behind the logical volume
+        if lvs "$dev" >/dev/null 2>&1; then dev=$(pvs --noheadings -o pv_name -S vg_name=$(lvs --noheadings -o vg_name "$dev") | head -1); fi
+        echo "$(echo $dev | xargs)"
+      register: part
+      changed_when: false
+
+    - name: Make the kernel see the new disk size
+      ansible.builtin.shell: |
+        disk=/sys/class/block/$(lsblk -no pkname {{ part.stdout }})/device/rescan
+        [ -e "$disk" ] && echo 1 > "$disk" || true
+      changed_when: false
+
+    - name: Grow the partition to the end of the disk
+      ansible.builtin.shell: >
+        growpart /dev/$(lsblk -no pkname {{ part.stdout }})
+        {{ part.stdout | regex_search('[0-9]+$') }}
+      register: gp
+      changed_when: "'CHANGED' in gp.stdout"
+      failed_when: gp.rc != 0 and 'NOCHANGE' not in gp.stdout
+
+    # --- LVM install (ISO): PV -> LV + filesystem ---
+    - name: Grow the LVM physical volume
+      ansible.builtin.command: pvresize {{ part.stdout }}
+      when: root_src.stdout is search('/dev/mapper/')
+      changed_when: true
+
+    - name: Grow the logical volume and its filesystem
+      community.general.lvol:
+        vg: "{{ root_src.stdout | regex_replace('^/dev/mapper/', , '') | replace('--', '-') }}"
+        lv: "{{ root_src.stdout | regex_replace('^.*-', '') }}"
+        size: +100%FREE
+        resizefs: true
+      when: root_src.stdout is search('/dev/mapper/')
+
+    # --- plain partition (cloud image): filesystem only ---
+    - name: Grow the filesystem
+      ansible.builtin.command: resize2fs {{ root_src.stdout }}
+      when: root_src.stdout is not search('/dev/mapper/')
+      changed_when: true
+
+    - name: Show the result
+      ansible.builtin.command: df -h /
+      register: df
+      changed_when: false
+    - ansible.builtin.debug:
+        var: df.stdout_lines

@@ -1,0 +1,6 @@
+# copy to hosts.conf (git-ignored): <name> <type> <address>
+# Credentials are read from Bitwarden: ESXi -> item named <address> (password),
+# Proxmox -> item named <address>-terr (username = token id, password = token secret).
+esxi-a   esxi     10.0.100.12
+esxi-b   esxi     10.0.100.17
+pve1     proxmox  10.0.12.235
